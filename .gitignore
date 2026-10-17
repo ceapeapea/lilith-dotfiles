@@ -1,4 +1,4 @@
-lilith
+/lilith
 *.o
 *-protocol.h
 wal_colors.h
