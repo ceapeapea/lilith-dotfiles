@@ -15,6 +15,12 @@
 # Use this instead of calling the lilith binary directly.
 set -eu
 
+# 0. где лежит исходник композитора: $LILITHDIR побеждает, иначе ищем
+if [ -z "${LILITHDIR:-}" ]; then
+	for d in "$HOME/lilith" "$HOME/lilith-compositor" "$HOME/src/lilith"; do
+		[ -f "$d/config.mk" ] && LILITHDIR="$d" && break
+	done
+fi
 LILITHDIR="${LILITHDIR:-$HOME/lilith}"
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/wal"
 SRC="$CACHE/lilith-colors.h"

@@ -14,6 +14,12 @@
 # script would kill your session). Reopen terminal windows for new foot colors.
 set -eu
 
+# где исходник композитора: $LILITHDIR побеждает, иначе ищем
+if [ -z "${LILITHDIR:-}" ]; then
+	for d in "$HOME/lilith" "$HOME/lilith-compositor" "$HOME/src/lilith"; do
+		[ -f "$d/config.mk" ] && LILITHDIR="$d" && break
+	done
+fi
 LILITHDIR="${LILITHDIR:-$HOME/lilith}"
 CACHE="$HOME/.cache/wal"
 WALHDR="$CACHE/lilith-colors.h"

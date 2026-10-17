@@ -21,89 +21,6 @@ index 268cc67..f4aa0b3 100644
  	config/config_appearance.h config/config_animation.h config/config_bar.h \
  	config/config_input.h config/config_keys.h cursor-shape-v1-protocol.h \
  	pointer-constraints-unstable-v1-protocol.h wlr-layer-shell-unstable-v1-protocol.h \
-diff --git a/README.md b/README.md
-index b645c68..4fae70c 100644
---- a/README.md
-+++ b/README.md
-@@ -1 +1,78 @@
- # lilith
-+
-+A wlroots-based Wayland compositor: floating windows on an endless zoomable
-+canvas, with a built-in status bar.
-+
-+| red | painting |
-+| --- | --- |
-+| ![red](screenshots/red.png) | ![painting](screenshots/painting.png) |
-+| **sky** | **field** |
-+| ![sky](screenshots/sky.png) | ![field](screenshots/field.jpg) |
-+
-+## How it works
-+
-+Windows are **free-floating** — drag them anywhere on an infinite canvas,
-+zoom the whole canvas with the scroll wheel, snap them to each other while
-+dragging. No tiling unless you want it.
-+
-+Everything follows **one pywal16 palette**. Pick a wallpaper image, and the
-+colours change everywhere at once: compositor borders, built-in bar, terminal,
-+GTK and Qt apps, dunst.
-+
-+The wallpaper is drawn by `swaybg` (not the compositor), and the config
-+compiles the current palette into the binary — so after changing the palette
-+you restart lilith once and everything is the new colour.
-+
-+## Packages
-+
-+Build (Arch/Artix names):
-+
-+```
-+base-devel wlroots0.19 libinput libxkbcommon libdrm fcft pixman xorg-server-xwayland xcb-util-wm
-+```
-+
-+Runtime (pywal16 is in the AUR):
-+
-+```
-+pywal16 foot wmenu dunst swaybg swayidle swaylock cliphist wl-clipboard grim slurp brightnessctl polkit-gnome yambar qt6ct ttf-nerd-fonts-symbols
-+```
-+
-+Also used by the author's own scripts (`~/.local/bin`, not in this repo):
-+`btop`, `tty-clock`, `yazi`, the Gallant Raster Term font.
-+
-+## Install
-+
-+```
-+git clone https://github.com/ohto121/lilith
-+cd lilith
-+make
-+./lilith    # from a TTY, after logging in
-+```
-+
-+The rice (the colours, keybinds and the bar) is on the `rice` branch; `main`
-+has the upstream defaults.
-+
-+## Usage
-+
-+- `wal-lilith <image>` — pick a wallpaper; the palette is generated from it,
-+  everything recolours and lilith rebuilds. Restart lilith to apply.
-+- `wal -R -n` — regenerate the palette files without touching the wallpaper.
-+- Win+Shift+Q — quit; log in again to start a fresh session.
-+
-+## Keys (default)
-+
-+- **Win+Q** terminal, **Win+R** launcher, **Win+C** close, **Win+F** fullscreen
-+- **Win+Shift+F/H/T/B/D** browser / telegram / btop / clock
-+- **Win+Z** zoom to fit all windows, **Win+=** / **Win+-** canvas zoom
-+- **Win+WASD** move focus, **Win+Tab** center a window, **Win+Home** canvas home
-+- **Win+1..9** tags, **Win+B** toggle the bar, **Win+L** lock
-+- Print / **Win+Shift+S** screenshots, **Win+V** clipboard history
-+- Left-drag on the canvas pans it, **Win+left-drag** moves a window,
-+  **Win+right-drag** resizes, scroll zooms.
-+
-+See `config/` for everything: every option has a comment.
-+
-+## Licenses
-+
-+MIT for lilith, GPL-style licenses for the parts inherited from dwl/dwm/sway
-+and tinywl — see the LICENSE* files.
 diff --git a/config.h b/config.h
 index 5f7db92..b9e66af 100644
 --- a/config.h
@@ -403,22 +320,6 @@ index 06736de..856d8a3 100644
  	{ 0, XKB_KEY_XF86MonBrightnessUp,   barspawn, {.v = brupcmd} },  /* brightness up */
  	{ 0, XKB_KEY_XF86MonBrightnessDown, barspawn, {.v = brdowncmd} },  /* brightness down */
  
-diff --git a/screenshots/field.jpg b/screenshots/field.jpg
-new file mode 100644
-index 0000000..26c4f14
-Binary files /dev/null and b/screenshots/field.jpg differ
-diff --git a/screenshots/painting.png b/screenshots/painting.png
-new file mode 100644
-index 0000000..b82b6d2
-Binary files /dev/null and b/screenshots/painting.png differ
-diff --git a/screenshots/red.png b/screenshots/red.png
-new file mode 100644
-index 0000000..6afd869
-Binary files /dev/null and b/screenshots/red.png differ
-diff --git a/screenshots/sky.png b/screenshots/sky.png
-new file mode 100644
-index 0000000..df4be49
-Binary files /dev/null and b/screenshots/sky.png differ
 diff --git a/src/lilith.c b/src/lilith.c
 index 7f80322..585de46 100644
 --- a/src/lilith.c
