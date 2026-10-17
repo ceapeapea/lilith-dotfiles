@@ -1,0 +1,34 @@
+#!/bin/sh
+# lilith-volume up|down|mute — change the default sink volume and show an OSD
+# (via dunst). Bound to the XF86Audio* keys in lilith's config.h.
+set -u
+
+sink="@DEFAULT_AUDIO_SINK@"
+
+case "${1:-}" in
+	up)   wpctl set-volume -l 1.0 "$sink" 5%+ ;;
+	down) wpctl set-volume "$sink" 5%- ;;
+	mute) wpctl set-mute "$sink" toggle ;;
+	*)
+		echo "usage: lilith-volume up|down|mute" >&2
+		exit 2
+		;;
+esac
+
+# wpctl prints e.g. "Volume: 0.45" or "Volume: 0.45 [MUTED]"
+info=$(wpctl get-volume "$sink" 2>/dev/null) || exit 0
+vol=$(printf '%s\n' "$info" | awk '{ printf "%d", $2 * 100 + 0.5 }')
+case "$info" in
+	*MUTED*) muted=1 ;;
+	*)       muted=0 ;;
+esac
+
+command -v dunstify >/dev/null 2>&1 || exit 0
+
+if [ "$muted" = 1 ]; then
+	dunstify -a volume -h string:x-dunst-stack-tag:volume \
+		-h int:value:0 "Muted" "%"
+else
+	dunstify -a volume -h string:x-dunst-stack-tag:volume \
+		-h int:value:"$vol" "${vol}%" "%"
+fi

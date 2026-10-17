@@ -1,0 +1,92 @@
+#!/bin/sh
+# lilith-session — start lilith with the newest pywal16 palette and the
+# wallpaper you last chose with `wal-lilith <image>`.
+#
+# On every start it:
+#   1. copies the generated palette (~/.cache/wal/lilith-colors.h) into the
+#      lilith source tree, but only when it actually changed
+#   2. rebuilds lilith if needed (a no-op when already up to date); if the
+#      build fails it still starts the existing binary, so a bad config edit
+#      can never lock you out of your session
+#   3. starts lilith; lilith runs lilith-autostart once the Wayland socket
+#      exists, which starts swaybg (wallpaper) and your session apps
+#   4. kills the session clients when lilith exits
+#
+# Use this instead of calling the lilith binary directly.
+set -eu
+
+LILITHDIR="${LILITHDIR:-$HOME/lilith}"
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/wal"
+SRC="$CACHE/lilith-colors.h"
+DEST="$LILITHDIR/wal_colors.h"
+BIN="$LILITHDIR/lilith"
+MODE="${WALBG_MODE:-fill}"
+
+# 1. sync the palette into the source tree (only if it changed, so make is quiet)
+if [ -f "$SRC" ] && ! cmp -s "$SRC" "$DEST"; then
+	cp "$SRC" "$DEST"
+	echo "lilith-session: new palette picked up"
+fi
+
+# 2. rebuild if needed; never block login on a broken build
+if ! make -C "$LILITHDIR" >/dev/null 2>&1; then
+	echo "lilith-session: WARNING: lilith build failed, starting the existing binary" >&2
+	if [ ! -x "$BIN" ]; then
+		echo "lilith-session: no usable lilith binary at $BIN" >&2
+		exit 1
+	fi
+fi
+
+if [ ! -x "$BIN" ]; then
+	echo "lilith-session: no lilith binary at $BIN (run 'make -C $LILITHDIR')" >&2
+	exit 1
+fi
+
+# 3. wallpaper recorded by the last `wal` run
+wp=""
+[ -f "$DEST" ] && wp=$(sed -n 's/^#define WAL_WALLPAPER[[:space:]]*"\(.*\)"/\1/p' "$DEST")
+
+if [ -n "$wp" ] && [ ! -f "$wp" ]; then
+	echo "lilith-session: wallpaper not found: $wp" >&2
+fi
+
+# 3b. Qt6 theming: apply the pywal palette via qt6ct. The system default
+#     (QT_QPA_PLATFORMTHEME=gtk2 in /etc/environment) cannot work on Wayland,
+#     because GTK2 has no Wayland backend.
+if [ -e /usr/lib/qt6/plugins/platformthemes/libqt6ct.so ]; then
+	unset QT_STYLE_OVERRIDE 2>/dev/null || true
+	export QT_QPA_PLATFORMTHEME=qt6ct
+fi
+
+# 3c. GTK: re-apply the pywal colours and make sure the theme name is valid —
+#     a gtk-theme-name pointing at a missing theme makes GTK fall back to a
+#     light default (which is why GTK3 apps such as Lutris looked out of place).
+selfdir=$(dirname "$0")
+if [ -x "$selfdir/wal-gtk" ]; then
+	"$selfdir/wal-gtk" || true
+fi
+
+# 4. start lilith. The -s command runs once the Wayland socket exists, so GUI
+#    clients (swaybg, gsr-ui, tg-ws-proxy) can connect. WAL_WALLPAPER is handed
+#    to lilith-autostart, which launches the wallpaper and the session apps.
+AUTOSTART="$selfdir/lilith-autostart"
+
+pkill -x swaybg 2>/dev/null || true
+
+if [ -x "$AUTOSTART" ]; then
+	WAL_WALLPAPER="$wp" "$BIN" -s "$AUTOSTART" "$@" || true
+elif [ -n "$wp" ] && [ -f "$wp" ] && command -v swaybg >/dev/null 2>&1; then
+	echo "lilith-session: wallpaper $wp"
+	"$BIN" -s "swaybg -i '$wp' -m '$MODE'" "$@" || true
+else
+	"$BIN" "$@" || true
+fi
+
+# 5. lilith exited — clean up the session clients it spawned
+pkill -x swaybg 2>/dev/null || true
+pkill -x tg-ws-proxy 2>/dev/null || true
+pkill -x gsr-ui 2>/dev/null || true
+pkill -x dunst 2>/dev/null || true
+pkill -x swayidle 2>/dev/null || true
+pkill -x yambar 2>/dev/null || true
+pkill -f lilith-capsnotify 2>/dev/null || true

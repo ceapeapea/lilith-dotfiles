@@ -1,0 +1,16 @@
+#!/bin/sh
+# lilith-cliphist — clipboard history picker (cliphist + wmenu).
+set -eu
+
+selfdir=$(dirname "$0")
+
+if ! command -v cliphist >/dev/null 2>&1; then
+	command -v notify-send >/dev/null 2>&1 && \
+		notify-send "Clipboard" "cliphist is not installed (pacman -S cliphist wl-clipboard)"
+	exit 1
+fi
+
+sel=$(cliphist list | "$selfdir/wmenu-pywal" -p 'clipboard:') || exit 0
+[ -n "$sel" ] || exit 0
+
+printf '%s\n' "$sel" | cliphist decode | wl-copy

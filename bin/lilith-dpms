@@ -1,0 +1,11 @@
+#!/bin/sh
+# lilith-dpms — turn every output on/off via wlopm, for swayidle.
+#   on  : wake all outputs
+#   off : power down all outputs
+set -eu
+
+case "${1:-}" in
+	off) exec wlopm --off '*' ;;
+	on)  exec wlopm --on  '*' ;;
+	*)   echo "usage: lilith-dpms {on|off}" >&2; exit 2 ;;
+esac

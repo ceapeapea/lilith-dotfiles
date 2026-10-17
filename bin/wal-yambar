@@ -1,0 +1,25 @@
+#!/bin/sh
+# wal-yambar — render ~/.config/yambar/config.yml with the current pywal16
+# palette (colors are substituted into config.yml.template, so yambar's own
+# braces are left untouched).
+set -eu
+
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/wal"
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/yambar"
+TPL="$CONF/config.yml.template"
+OUT="$CONF/config.yml"
+
+[ -f "$TPL" ] || { echo "wal-yambar: missing $TPL" >&2; exit 1; }
+[ -f "$CACHE/colors.sh" ] || { echo "wal-yambar: no palette (run wal first)" >&2; exit 1; }
+
+. "$CACHE/colors.sh"
+strip() { printf '%s' "${1#\#}"; }
+
+sed \
+	-e "s|@BG@|$(strip "${background:-#000000}")|g" \
+	-e "s|@FG@|$(strip "${foreground:-#ffffff}")|g" \
+	-e "s|@ACCENT@|$(strip "${color4:-#5f87af}")|g" \
+	-e "s|@OK@|$(strip "${color2:-#00ff00}")|g" \
+	"$TPL" > "$OUT"
+
+echo "wal-yambar: wrote $OUT"

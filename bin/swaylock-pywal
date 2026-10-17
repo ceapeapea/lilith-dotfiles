@@ -1,0 +1,44 @@
+#!/bin/sh
+# swaylock-pywal — lock the screen, themed with the current pywal palette and
+# the wallpaper of the last `wal` run.
+set -eu
+
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/wal"
+LILITHDIR="${LILITHDIR:-$HOME/lilith}"
+
+if [ -f "$CACHE/colors.sh" ]; then
+	. "$CACHE/colors.sh"
+fi
+
+bg=${background:-#000000}
+fg=${foreground:-#ffffff}
+c1=${color1:-#ff0000}
+c2=${color2:-#00ff00}
+c4=${color4:-#5f87af}
+
+# swaylock accepts hex with or without '#'; strip it for consistency.
+strip() { printf '%s' "${1#\#}"; }
+
+# wallpaper recorded by the last `wal` run
+wp=""
+[ -f "$LILITHDIR/wal_colors.h" ] && \
+	wp=$(sed -n 's/^#define WAL_WALLPAPER[[:space:]]*"\(.*\)"/\1/p' "$LILITHDIR/wal_colors.h")
+
+set -- \
+	--color "$(strip "$bg")" \
+	--inside-color "$(strip "$bg")" \
+	--ring-color "$(strip "$c4")" \
+	--key-hl-color "$(strip "$c2")" \
+	--bs-hl-color "$(strip "$c1")" \
+	--line-color "$(strip "$bg")" \
+	--separator-color "$(strip "$bg")" \
+	--text-color "$(strip "$fg")" \
+	--scaling fill \
+	--ignore-empty-password \
+	--show-failed-attempts
+
+if [ -n "$wp" ] && [ -f "$wp" ]; then
+	set -- "$@" --image "$wp"
+fi
+
+exec swaylock "$@"

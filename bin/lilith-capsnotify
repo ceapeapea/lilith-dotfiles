@@ -1,0 +1,29 @@
+#!/bin/sh
+# lilith-capsnotify — show an OSD (via dunst) whenever Caps Lock is toggled.
+#
+# lilith (dwl) gives scripts no way to observe lock-key state, so we watch the
+# keyboard LED in sysfs: wlroots keeps it in sync with the xkb caps state.
+set -u
+
+led=""
+for f in /sys/class/leds/*capslock*/brightness; do
+	[ -e "$f" ] && { led="$f"; break; }
+done
+[ -n "$led" ] || exit 0
+
+command -v dunstify >/dev/null 2>&1 || exit 0
+
+prev=$(cat "$led" 2>/dev/null || echo "")
+while :; do
+	sleep 0.25
+	cur=$(cat "$led" 2>/dev/null || echo "$prev")
+	[ "$cur" = "$prev" ] && continue
+	prev="$cur"
+	if [ "$cur" = 1 ]; then
+		dunstify -a capslock -h string:x-dunst-stack-tag:capslock \
+			"Caps Lock" "ON"
+	else
+		dunstify -a capslock -h string:x-dunst-stack-tag:capslock \
+			"Caps Lock" "OFF"
+	fi
+done

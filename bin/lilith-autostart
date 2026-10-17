@@ -1,0 +1,64 @@
+#!/bin/sh
+# lilith-autostart — session applications, started once lilith's Wayland
+# socket exists.
+#
+# lilith (dwl-based) has no XDG autostart support, so this is run by lilith's
+# `-s` startup command (see lilith-session). Everything is launched in the
+# background, so lilith is never blocked.
+#
+# Add or remove session apps in the "autostart apps" block below.
+set -u
+
+MODE="${WALBG_MODE:-fill}"
+selfdir=$(dirname "$0")
+
+# start <cmd...> — run a command detached, ignoring missing binaries.
+start() {
+	command -v "$1" >/dev/null 2>&1 || return 0
+	"$@" </dev/null >/dev/null 2>&1 &
+}
+
+# --- wallpaper -------------------------------------------------------------
+# WAL_WALLPAPER is exported by lilith-session from the last `wal` run.
+if [ -n "${WAL_WALLPAPER:-}" ] && [ -f "$WAL_WALLPAPER" ]; then
+	start swaybg -i "$WAL_WALLPAPER" -m "$MODE"
+fi
+
+# --- session daemons -------------------------------------------------------
+
+# notifications
+start dunst
+
+# caps lock OSD (watches the keyboard LED) — drop any stale instance first
+pkill -f "$selfdir/lilith-capsnotify" 2>/dev/null || true
+start "$selfdir/lilith-capsnotify"
+
+# polkit authentication agent (GUI password prompts for mount/update/USB…)
+start /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
+
+# clipboard history (cliphist is fed by a wl-clipboard watcher)
+start wl-paste --watch cliphist store
+
+# idle: lock at 5 min, screen off at 10 min, wake on activity, lock before sleep
+start swayidle -w \
+	timeout 300 "$selfdir/swaylock-pywal" \
+	timeout 600 "$selfdir/lilith-dpms off" \
+	resume "$selfdir/lilith-dpms on" \
+	before-sleep "$selfdir/swaylock-pywal"
+
+# status bar: встроенный бар lilith (цвета компилируются из wal_colors.h,
+# плашка Win+B — переключение бара). yambar больше не запускаем; скрипты
+# wal-yambar/conf остались на случай отката:
+# "$selfdir/wal-yambar" >/dev/null 2>&1 || true
+# start yambar
+
+# --- autostart apps --------------------------------------------------------
+
+# telegram web socket proxy
+start tg-ws-proxy
+
+# GPU Screen Recorder overlay (launch-hide: loaded in the background,
+# UI opens with Alt+Z)
+start gsr-ui launch-hide
+
+wait

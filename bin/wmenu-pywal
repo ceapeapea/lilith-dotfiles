@@ -1,0 +1,24 @@
+#!/bin/sh
+# wmenu-pywal — run wmenu with the current pywal16 palette.
+#
+# Reads a newline-separated list from stdin (wmenu, not wmenu-run, which dumps
+# every executable in $PATH). Use wmenu-apps for the app launcher.
+#
+# Override the base command with MENU=/path/to/menu.
+set -eu
+
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/wal"
+
+if [ -f "$CACHE/colors.sh" ]; then
+	. "$CACHE/colors.sh"
+	set -- \
+		-N "${background:-#1e1e1e}" \
+		-n "${foreground:-#d0d0d0}" \
+		-M "${color4:-#5f87af}" \
+		-m "${background:-#1e1e1e}" \
+		-S "${background:-#1e1e1e}" \
+		-s "${color6:-#8fbfbf}" \
+		"$@"
+fi
+
+exec "${MENU:-/usr/bin/wmenu}" "$@"

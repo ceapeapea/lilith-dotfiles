@@ -1,0 +1,93 @@
+#!/bin/sh
+# wal-lilith — apply a pywal16 colorscheme to your lilith setup.
+#
+#   wal-lilith <image>   generate the palette from <image>, recolor, set wallpaper
+#   wal-lilith           reuse the last generated palette
+#
+# What it does:
+#   1. runs wal (colors only, -n: it does NOT touch the wallpaper)
+#   2. copies the generated C header into the lilith source tree
+#   3. rebuilds lilith so the new border/background colors are compiled in
+#   4. restarts swaybg on the wallpaper
+#
+# lilith itself is only restarted by you (restarting a compositor from a
+# script would kill your session). Reopen terminal windows for new foot colors.
+set -eu
+
+LILITHDIR="${LILITHDIR:-$HOME/lilith}"
+CACHE="$HOME/.cache/wal"
+WALHDR="$CACHE/lilith-colors.h"
+DEST="$LILITHDIR/wal_colors.h"
+MODE="${WALBG_MODE:-fill}"
+
+if [ "${1:-}" != "" ]; then
+	wal -i "$1" -n
+else
+	wal -R
+fi
+
+if [ ! -f "$WALHDR" ]; then
+	echo "wal-lilith: $WALHDR not found; run 'wal-lilith <image>' first" >&2
+	exit 1
+fi
+
+cp "$WALHDR" "$DEST"
+if ! make -C "$LILITHDIR" >/dev/null 2>&1; then
+	echo "wal-lilith: lilith rebuild failed:" >&2
+	make -C "$LILITHDIR" >&2
+	exit 1
+fi
+echo "wal-lilith: lilith rebuilt with the new palette"
+
+# wallpaper via swaybg — independent of lilith's own wallpaper code
+wp=$(sed -n 's/^#define WAL_WALLPAPER[[:space:]]*"\(.*\)"/\1/p' "$DEST")
+pkill -x swaybg 2>/dev/null || true
+if [ -n "$wp" ] && [ -f "$wp" ]; then
+	if command -v swaybg >/dev/null 2>&1; then
+		setsid swaybg -i "$wp" -m "$MODE" >/dev/null 2>&1 &
+		echo "wal-lilith: wallpaper set to $wp (mode: $MODE)"
+	else
+		echo "wal-lilith: swaybg not installed; skipping wallpaper" >&2
+	fi
+fi
+
+# desktop-portal / GTK appearance (color-scheme + nearest accent)
+selfdir=$(dirname "$0")
+if [ -x "$selfdir/wal-portal" ]; then
+	"$selfdir/wal-portal" || true
+fi
+
+# GTK3 + GTK4/libadwaita colors
+if [ -x "$selfdir/wal-gtk" ]; then
+	"$selfdir/wal-gtk" || true
+fi
+
+# Qt6 (qt6ct) colors
+if [ -x "$selfdir/wal-qt" ]; then
+	"$selfdir/wal-qt" || true
+fi
+
+# dunst notifications: keep ~/.config/dunst/dunstrc pointed at the palette
+if command -v dunstctl >/dev/null 2>&1; then
+	mkdir -p "$HOME/.config/dunst"
+	if [ ! -L "$HOME/.config/dunst/dunstrc" ]; then
+		[ -f "$HOME/.config/dunst/dunstrc" ] && \
+			mv "$HOME/.config/dunst/dunstrc" "$HOME/.config/dunst/dunstrc.bak" 2>/dev/null || true
+		ln -sf "$CACHE/dunstrc" "$HOME/.config/dunst/dunstrc"
+	fi
+	dunstctl reload 2>/dev/null || true
+fi
+
+# yambar больше не основной бар: бар теперь встроен в lilith и берёт цвета из
+# wal_colors.h (пересобирается выше, падают в силу после рестарта сессии).
+# Этот блок оставлен для отката: перерисовать/перезапустить yambar, если он запущен.
+if [ -x "$selfdir/wal-yambar" ]; then
+	"$selfdir/wal-yambar" || true
+	if pgrep -x yambar >/dev/null 2>&1; then
+		pkill -x yambar 2>/dev/null || true
+		sleep 0.2
+		setsid yambar >/dev/null 2>&1 &
+	fi
+fi
+
+echo "wal-lilith: done. Restart lilith to see the new border and bar colors."

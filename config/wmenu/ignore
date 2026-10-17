@@ -1,0 +1,35 @@
+# ~/.config/wmenu/ignore — .desktop entries hidden from the Win+R launcher.
+#
+# One id per line, exactly as it appears under an XDG applications dir, e.g.
+# "foo.desktop". Lines starting with # are comments. Entries with
+# NoDisplay=true or Hidden=true are already skipped automatically.
+#
+# Add/remove ids here to tune the menu; no need to restart anything.
+
+# Avahi service browsers
+avahi-discover.desktop
+bssh.desktop
+bvnc.desktop
+
+# system / hardware tools
+cups.desktop
+lstopo.desktop
+qv4l2.desktop
+qvidcap.desktop
+tg-ws-proxy.desktop
+cmake-gui.desktop
+
+# foot client/server (not standalone apps)
+footclient.desktop
+foot-server.desktop
+
+# GNOME/MATE leftovers and internal helpers
+mate-about.desktop
+mate-color-select.desktop
+gcr-prompter.desktop
+gcr-viewer.desktop
+org.freedesktop.Xwayland.desktop
+org.gnome.Zenity.desktop
+org.gnupg.pinentry-qt5.desktop
+org.gnupg.pinentry-qt.desktop
+xdg-desktop-portal-gtk.desktop

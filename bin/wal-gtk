@@ -1,0 +1,87 @@
+#!/bin/sh
+# wal-gtk — apply the pywal16 palette to GTK3 and GTK4/libadwaita.
+#
+# Writes ~/.config/gtk-3.0/gtk.css and ~/.config/gtk-4.0/gtk.css from the
+# generated ~/.cache/wal/gtk-colors.css. Originals are backed up once as
+# gtk.css.pre-pywal. GTK4 keeps its libadwaita imports so the theme still
+# works; GTK3 keeps any non-color rules that were there before.
+set -eu
+
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/wal"
+SRC="$CACHE/gtk-colors.css"
+G3="$HOME/.config/gtk-3.0"
+G4="$HOME/.config/gtk-4.0"
+
+if [ ! -f "$SRC" ]; then
+	echo "wal-gtk: no $SRC (run wal first)" >&2
+	exit 1
+fi
+
+mkdir -p "$G3" "$G4"
+
+# one-time backups
+for f in "$G3/gtk.css" "$G4/gtk.css"; do
+	if [ -f "$f" ] && [ ! -f "$f.pre-pywal" ]; then
+		cp "$f" "$f.pre-pywal"
+	fi
+done
+
+# GTK4: libadwaita imports first, then our colours, so ours win in-provider
+{
+	[ -f "$G4/libadwaita.css" ] && echo "@import 'libadwaita.css';"
+	[ -f "$G4/libadwaita-tweaks.css" ] && echo "@import 'libadwaita-tweaks.css';"
+	echo
+	cat "$SRC"
+} > "$G4/gtk.css"
+
+# GTK3: colors + whatever non-color rules existed before
+cat "$SRC" > "$G3/gtk.css"
+if [ -f "$G3/gtk.css.pre-pywal" ]; then
+	grep -vE '^[[:space:]]*@define-color|^[[:space:]]*@import' "$G3/gtk.css.pre-pywal" >> "$G3/gtk.css" || true
+fi
+
+# Real GTK3 widget rules. Adwaita paints with literal colours and barely uses
+# its named colours, so redefining @define-color from another provider changes
+# nothing — only actual rules recolour widgets.
+EXTRA="$CACHE/gtk3-extra.css"
+if [ -f "$EXTRA" ]; then
+	cat "$EXTRA" >> "$G3/gtk.css"
+fi
+
+# Theme sanity: if gtk-theme-name points at a theme that isn't installed, GTK
+# falls back to a *light* default — which is why GTK3 apps (e.g. Lutris) can
+# look out of place. Enforce a valid, dark theme; Adwaita matches the
+# libadwaita/GTK4 apps and is always present (it's built into GTK).
+THEME=Adwaita
+theme_ok() {
+	case "$1" in
+		Adwaita) return 0 ;;
+		"") return 1 ;;
+	esac
+	[ -d "/usr/share/themes/$1" ] || [ -d "$HOME/.themes/$1" ] || \
+		[ -d "$HOME/.local/share/themes/$1" ]
+}
+for ini in "$G3/settings.ini" "$G4/settings.ini"; do
+	[ -f "$ini" ] || continue
+	cur=$(sed -n 's/^gtk-theme-name=//p' "$ini" | head -n1)
+	if ! theme_ok "$cur"; then
+		if grep -q '^gtk-theme-name=' "$ini"; then
+			sed -i "s|^gtk-theme-name=.*|gtk-theme-name=$THEME|" "$ini"
+		else
+			sed -i "/^\[Settings\]/a gtk-theme-name=$THEME" "$ini"
+		fi
+	fi
+	grep -q '^gtk-application-prefer-dark-theme=' "$ini" || \
+		sed -i "/^\[Settings\]/a gtk-application-prefer-dark-theme=1" "$ini"
+done
+
+# gsettings/dconf is what GTK and the desktop portal read first.
+if command -v gsettings >/dev/null 2>&1; then
+	cur=$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null | tr -d "'")
+	if ! theme_ok "$cur"; then
+		gsettings set org.gnome.desktop.interface gtk-theme "$THEME" 2>/dev/null || true
+	fi
+	gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null || true
+fi
+
+echo "wal-gtk: wrote $G3/gtk.css and $G4/gtk.css"

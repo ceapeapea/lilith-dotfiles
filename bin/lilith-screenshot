@@ -1,0 +1,34 @@
+#!/bin/sh
+# lilith-screenshot — grim screenshots, no editor/UI afterwards.
+#   full   : whole screen
+#   region : drag-select an area
+# Both save a PNG to ~/Pictures/Screenshots and copy it to the clipboard.
+set -eu
+
+DIR="${XDG_PICTURES_DIR:-$HOME/Pictures}/Screenshots"
+mkdir -p "$DIR"
+file="$DIR/$(date +%Y-%m-%d_%H-%M-%S).png"
+
+notify() { command -v notify-send >/dev/null 2>&1 && notify-send "$@"; }
+
+case "${1:-full}" in
+	full)
+		grim "$file"
+		;;
+	region)
+		command -v slurp >/dev/null 2>&1 || { echo "lilith-screenshot: slurp not installed" >&2; exit 1; }
+		geom=$(slurp) || exit 0        # selection cancelled
+		grim -g "$geom" "$file"
+		;;
+	*)
+		echo "usage: lilith-screenshot {full|region}" >&2
+		exit 2
+		;;
+esac
+
+if command -v wl-copy >/dev/null 2>&1; then
+	wl-copy < "$file"
+	notify -i "$file" "Screenshot" "Saved + copied to clipboard"
+else
+	notify -i "$file" "Screenshot" "Saved: $file"
+fi

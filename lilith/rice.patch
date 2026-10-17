@@ -1,0 +1,436 @@
+diff --git a/.gitignore b/.gitignore
+index 191e3de..e0db071 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,4 +1,5 @@
+ lilith
+ *.o
+ *-protocol.h
++wal_colors.h
+ lilith-*.tar.gz
+diff --git a/Makefile b/Makefile
+index 268cc67..f4aa0b3 100644
+--- a/Makefile
++++ b/Makefile
+@@ -19,7 +19,7 @@ LDLIBS    = `$(PKG_CONFIG) --libs $(PKGS)` $(WLR_LIBS) -lm $(LIBS)
+ all: lilith
+ lilith: lilith.o util.o
+ 	$(CC) lilith.o util.o $(LILITHCFLAGS) $(LDFLAGS) $(LDLIBS) -o $@
+-lilith.o: lilith.c client.h wallpaper.h bar.h stb_image.h config.h config.mk \
++lilith.o: lilith.c client.h wallpaper.h bar.h stb_image.h config.h wal_colors.h config.mk \
+ 	config/config_appearance.h config/config_animation.h config/config_bar.h \
+ 	config/config_input.h config/config_keys.h cursor-shape-v1-protocol.h \
+ 	pointer-constraints-unstable-v1-protocol.h wlr-layer-shell-unstable-v1-protocol.h \
+diff --git a/README.md b/README.md
+index b645c68..4fae70c 100644
+--- a/README.md
++++ b/README.md
+@@ -1 +1,78 @@
+ # lilith
++
++A wlroots-based Wayland compositor: floating windows on an endless zoomable
++canvas, with a built-in status bar.
++
++| red | painting |
++| --- | --- |
++| ![red](screenshots/red.png) | ![painting](screenshots/painting.png) |
++| **sky** | **field** |
++| ![sky](screenshots/sky.png) | ![field](screenshots/field.jpg) |
++
++## How it works
++
++Windows are **free-floating** — drag them anywhere on an infinite canvas,
++zoom the whole canvas with the scroll wheel, snap them to each other while
++dragging. No tiling unless you want it.
++
++Everything follows **one pywal16 palette**. Pick a wallpaper image, and the
++colours change everywhere at once: compositor borders, built-in bar, terminal,
++GTK and Qt apps, dunst.
++
++The wallpaper is drawn by `swaybg` (not the compositor), and the config
++compiles the current palette into the binary — so after changing the palette
++you restart lilith once and everything is the new colour.
++
++## Packages
++
++Build (Arch/Artix names):
++
++```
++base-devel wlroots0.19 libinput libxkbcommon libdrm fcft pixman xorg-server-xwayland xcb-util-wm
++```
++
++Runtime (pywal16 is in the AUR):
++
++```
++pywal16 foot wmenu dunst swaybg swayidle swaylock cliphist wl-clipboard grim slurp brightnessctl polkit-gnome yambar qt6ct ttf-nerd-fonts-symbols
++```
++
++Also used by the author's own scripts (`~/.local/bin`, not in this repo):
++`btop`, `tty-clock`, `yazi`, the Gallant Raster Term font.
++
++## Install
++
++```
++git clone https://github.com/ohto121/lilith
++cd lilith
++make
++./lilith    # from a TTY, after logging in
++```
++
++The rice (the colours, keybinds and the bar) is on the `rice` branch; `main`
++has the upstream defaults.
++
++## Usage
++
++- `wal-lilith <image>` — pick a wallpaper; the palette is generated from it,
++  everything recolours and lilith rebuilds. Restart lilith to apply.
++- `wal -R -n` — regenerate the palette files without touching the wallpaper.
++- Win+Shift+Q — quit; log in again to start a fresh session.
++
++## Keys (default)
++
++- **Win+Q** terminal, **Win+R** launcher, **Win+C** close, **Win+F** fullscreen
++- **Win+Shift+F/H/T/B/D** browser / telegram / btop / clock
++- **Win+Z** zoom to fit all windows, **Win+=** / **Win+-** canvas zoom
++- **Win+WASD** move focus, **Win+Tab** center a window, **Win+Home** canvas home
++- **Win+1..9** tags, **Win+B** toggle the bar, **Win+L** lock
++- Print / **Win+Shift+S** screenshots, **Win+V** clipboard history
++- Left-drag on the canvas pans it, **Win+left-drag** moves a window,
++  **Win+right-drag** resizes, scroll zooms.
++
++See `config/` for everything: every option has a comment.
++
++## Licenses
++
++MIT for lilith, GPL-style licenses for the parts inherited from dwl/dwm/sway
++and tinywl — see the LICENSE* files.
+diff --git a/config.h b/config.h
+index 5f7db92..b9e66af 100644
+--- a/config.h
++++ b/config.h
+@@ -5,6 +5,9 @@
+ 
+ /* Converts a 0xRRGGBBAA hex value into a float[4] RGBA initializer
+  * (each channel 0.0 - 1.0), the format wlroots expects for colors. */
++
++/* pywal16 palette — regenerate with `wal-lilith <image>` */
++#include "wal_colors.h"
+ #define COLOR(hex)    { ((hex >> 24) & 0xFF) / 255.0f, \
+                         ((hex >> 16) & 0xFF) / 255.0f, \
+                         ((hex >> 8) & 0xFF) / 255.0f, \
+diff --git a/config/config_appearance.h b/config/config_appearance.h
+index bd16e79..eb66464 100644
+--- a/config/config_appearance.h
++++ b/config/config_appearance.h
+@@ -3,12 +3,12 @@ static const int sloppyfocus                       = 1;  /* 1 = focus follows th
+ static const int bypass_surface_visibility         = 0;  /* 1 = idle inhibitors from any surface count, even invisible ones; 0 = only visible surfaces inhibit idle */
+ 
+ /* Background color of the empty canvas (0xRRGGBBAA). */
+-static const float rootcolor[]                     = COLOR(0x222222ff);
++static const float rootcolor[]                     = WAL_BG;
+ 
+ /* --- Wallpaper (leave wallpaper_path empty to disable it) --- */
+ static const char *wallpaper_path = "";  /* path to the image file; "" = no wallpaper */
+ static const int wallpaper_mode = 1;  /* 1 = wallpaper follows canvas zoom and pan, 0 = static image fitted to the monitor (see wallpaper_fit) */
+-static const float wallpaper_bgcolor[] = COLOR(0x222222ff);  /* fill color shown where the image does not cover the monitor */
++static const float wallpaper_bgcolor[] = WAL_BG;  /* fill color shown where the image does not cover the monitor */
+ static const int wallpaper_fit = 0;  /* mode 0 only: 0 = cover (fill and crop), 1 = contain (fit inside), other = stretch */
+ static const double wallpaper_zoom_strength = 1.0;  /* mode 1 only: exponent applied to the zoom factor; 1.0 = zooms with the windows, 0 = never zooms */
+ static const double wallpaper_pan_factor = 0.3;  /* mode 1 only: share of the canvas pan applied to the wallpaper; 1.0 = moves with windows, 0 = fixed, in between = parallax */
+@@ -19,36 +19,38 @@ static const int wallpaper_edge = 1;  /* mode 1 only: 1 = never show the backgro
+ /* Inner border width in pixels. */
+ static const unsigned int innerborderpx = 5;
+ 
+-static const float focused_inner_border_color[]    = COLOR(0x00557700);  /* inner border of the focused window (0xRRGGBBAA; alpha 00 = invisible) */
+-static const float urgent_inner_border_color[]     = COLOR(0xff000000);  /* inner border of a window requesting attention */
+-static const float unfocused_inner_border_color[]  = COLOR(0x44444400);  /* inner border of unfocused windows */
++static const float focused_inner_border_color[]    = WAL_BG_CLEAR;  /* inner border of the focused window (0xRRGGBBAA; alpha 00 = invisible) */
++static const float urgent_inner_border_color[]     = WAL_BG_CLEAR;  /* inner border of a window requesting attention */
++static const float unfocused_inner_border_color[]  = WAL_FG_CLEAR;  /* inner border of unfocused windows */
+ 
+ /* Outer border width in pixels. */
+ static const unsigned int outerborderpx = 5;
+ 
+-static const float focused_outer_border_color[]    = COLOR(0x005577ff);  /* outer border of the focused window */
+-static const float urgent_outer_border_color[]     = COLOR(0xff0000ff);  /* outer border of a window requesting attention */
+-static const float unfocused_outer_border_color[]  = COLOR(0x444444ff);  /* outer border of unfocused windows */
++/* Focus highlight disabled: focused border matches unfocused. */
++static const float focused_outer_border_color[]    = WAL_BG;
++static const float urgent_outer_border_color[]     = WAL_URGENT;
++static const float unfocused_outer_border_color[]  = WAL_BG;
+ 
+ /* Gap in pixels between windows when they snap to each other while being
+- * moved or resized; negative values make neighbouring borders overlap. */
+-#define WINDOW_GAP 0
++ * moved or resized; negative values make neighbouring borders overlap.
++ * -5 is tuned so there is no visual gap with 5px borders. */
++#define WINDOW_GAP -5
+ 
+ /* --- Spawn region: the rectangle drawn while dragging out an area on the
+  *     empty canvas to choose where a new window opens --- */
+ 
+ /* Appearance: 0 = invisible, 1 = filled with SPAWNREGION_COLOR,
+  * 2 = outlined using the spawnregion_* border settings below. */
+-#define SPAWNREGION_STYLE 1
++#define SPAWNREGION_STYLE 2
+ 
+ /* Fill color for style 1 (0xRRGGBBAA). */
+-#define SPAWNREGION_COLOR COLOR(0x00557770)
++#define SPAWNREGION_COLOR WAL_BG_DIM
+ 
+ /* Border settings used by style 2: inner border width in pixels. */
+-static const unsigned int spawnregion_innerborderpx  = 5;
+-static const unsigned int spawnregion_outerborderpx  = 5;  /* outer border width in pixels */
+-static const float spawnregion_inner_border_color[]  = COLOR(0x005577ff);  /* inner border color */
+-static const float spawnregion_outer_border_color[]  = COLOR(0x005577ff);  /* outer border color */
++static const unsigned int spawnregion_innerborderpx  = 3;
++static const unsigned int spawnregion_outerborderpx  = 7;  /* outer border width in pixels */
++static const float spawnregion_inner_border_color[]  = WAL_ACCENT;  /* inner border color */
++static const float spawnregion_outer_border_color[]  = WAL_BG;  /* outer border color */
+ 
+ /* Background color (RGBA floats) behind fullscreen windows. */
+-static const float fullscreen_bg[]         = {0.0f, 0.0f, 0.0f, 1.0f};
++static const float fullscreen_bg[]         = WAL_BG;
+diff --git a/config/config_bar.h b/config/config_bar.h
+index 63e23e4..2e6178b 100644
+--- a/config/config_bar.h
++++ b/config/config_bar.h
+@@ -34,10 +34,10 @@ enum { SchemeOcc = SchemeUrg + 1, SchemeBar, SchemeStatus, SchemeSep, SchemeBord
+ 
+ /* --- Position and size --- */
+ static const int showbar         = 1;  /* 1 = bar visible at startup */
+-static const int barpos          = BarTop;  /* screen edge: BarTop, BarBottom, BarLeft or BarRight */
++static const int barpos          = BarBottom;  /* screen edge: BarTop, BarBottom, BarLeft or BarRight */
+ static const int barreserve      = 0;  /* 1 = reserve screen space for the bar, 0 = bar floats over the windows */
+ static const int barabovewindows = 1;  /* 1 = bar is drawn above windows, 0 = below them */
+-static const int barmargin[4]    = { 0, 0, 0, 0 };  /* outer margin in pixels: { top, right, bottom, left } */
++static const int barmargin[4]    = { 0, 16, 0, 16 };  /* outer margin in pixels: { top, right, bottom, left } */
+ static const int bargap          = 0;  /* extra space between the bar and the windows when space is reserved */
+ static const int barthickness    = 0;  /* bar height (width when vertical); 0 = derived from font size and padding */
+ static const int barlength       = 0;  /* fixed bar length; 0 = use barlengthpct or the full edge */
+@@ -50,12 +50,12 @@ static const int barborderpx     = 0;  /* width of the bar border (colored by Sc
+ static const int barpad          = 0;  /* padding between the border and the bar content */
+ 
+ /* Fonts as fontconfig patterns; the first is primary, the rest are fallbacks (put an icon font here for the ICO_* glyphs). */
+-static const char *barfonts[]    = { "monospace:size=10" };
++static const char *barfonts[]    = { "Gallant Raster Term:size=12", "Symbols Nerd Font:size=12" };
+ static const int barvpad         = 5;  /* vertical padding above and below text */
+ static const int barlrpad        = 2;  /* horizontal padding around text; 0 = use the font height */
+ 
+ /* --- Modules and separators --- */
+-static const int barorder[]      = { BarModTags, BarModSpacer, BarModStatus };  /* modules from start to end of the bar */
++static const int barorder[]      = { BarModStatus, BarModSpacer, BarModTags, BarModSpacer, BarModBattery, BarModVolume };  /* modules from start to end of the bar */
+ static const int barmodulegap    = 2;  /* gap between modules */
+ static const int barsepwidth     = 0;  /* thickness of the separator line between modules; 0 = none (needs barmodulegap > 0) */
+ static const int barseppct       = 60;  /* separator line length as a percentage of the bar thickness (max 100) */
+@@ -92,11 +92,11 @@ static const char *barshowbezier    = ".28,.67,.28,1.04";  /* show easing curve
+ /* --- Status modules and data sources --- */
+ static const int barstatusallmons = 0;  /* 1 = show status modules on every monitor, 0 = only on the focused one */
+ #define barstatusstdin  0  /* 1 = read the status text from stdin when it is not a terminal (dwm-style status pipe) */
+-static const char *barclockfmt   = "%H:%M";  /* strftime() format of the built-in clock (updates every second if it contains seconds, otherwise every minute) */
++static const char *barclockfmt   = "lilith  %H:%M";  /* strftime() format of the built-in clock (updates every second if it contains seconds, otherwise every minute) */
+ 
+ /* Polling intervals and device selection. */
+ static const int barsysinterval  = 2000;  /* ms between CPU/RAM/temperature/battery/brightness updates */
+-static const int barvolinterval  = 5000;  /* ms between volume refreshes (checked on the system tick) */
++static const int barvolinterval  = 2000;  /* ms between volume refreshes (checked on the system tick) */
+ static const int barkickms       = 150;  /* ms after a barspawn() command before modules are refreshed, so volume and brightness react to key presses */
+ static const char *barvolcmd[]   = { "wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@", NULL };  /* command whose output is parsed for the volume */
+ static const char *barbatname    = "";  /* battery under /sys/class/power_supply (e.g. "BAT0"); "" = first found */
+@@ -106,7 +106,7 @@ static const int barbatwarn      = 20;  /* battery % at or below which the low-b
+ static const int barcpuwarn      = 85;  /* CPU load % at or above which the warning color is used */
+ static const int barramwarn      = 85;  /* RAM usage % at or above which the warning color is used */
+ static const int bartempwarn     = 80;  /* temperature in degrees C at or above which the warning color is used */
+-static const char *barlayoutnames[] = { "us" };  /* display names for keyboard layouts, indexed by layout number (see xkb_rules) */
++static const char *barlayoutnames[] = { "us", "ru" };  /* display names for keyboard layouts, indexed by layout number (see xkb_rules) */
+ 
+ /* --- Icons: UTF-8 byte sequences of Font Awesome glyphs (an icon font must
+  *     be available in barfonts[]) --- */
+@@ -148,27 +148,28 @@ static const char *baricon_layout  = ICO_LAYOUT;  /* keyboard layout */
+ /* --- Colors ---
+  * Each scheme is { foreground, background, accent } as 0xRRGGBBAA.
+  * The accent is used for tag decorations and occupied indicators;
+- * 0 = use the foreground color. A background alpha of 00 is transparent. */
++ * 0 = use the foreground color. A background alpha of 00 is transparent.
++ * All colors come from pywal (WALR_* raw hex defines from wal_colors.h). */
+ static const uint32_t barcolors[SchemeCount][3] = {
+-	[SchemeNorm]      = { 0xbbbbbbff, 0x222222ff, 0 },  /* tag: normal */
+-	[SchemeSel]       = { 0xeeeeeeff, 0x005577ff, 0 },  /* tag: selected */
+-	[SchemeUrg]       = { 0xeeeeeeff, 0xff0000ff, 0 },  /* tag: urgent */
+-	[SchemeOcc]       = { 0xeeeeeeff, 0x222222ff, 0 },  /* tag: occupied (see baroccscheme) */
+-	[SchemeBar]       = { 0xbbbbbbff, 0x222222ff, 0 },  /* bar background */
+-	[SchemeStatus]    = { 0xbbbbbbff, 0x00000000, 0 },  /* status text */
+-	[SchemeSep]       = { 0x777777ff, 0x444444ff, 0 },  /* module separators */
+-	[SchemeBorder]    = { 0,          0x005577ff, 0 },  /* bar border (background value is the border color) */
+-	[SchemeVolume]    = { 0xbbbbbbff, 0x00000000, 0 },  /* volume module */
+-	[SchemeMuted]     = { 0x777777ff, 0x00000000, 0 },  /* volume module while muted */
+-	[SchemeBrightness]= { 0xbbbbbbff, 0x00000000, 0 },  /* brightness module */
+-	[SchemeBattery]   = { 0xbbbbbbff, 0x00000000, 0 },  /* battery module */
+-	[SchemeBatChg]    = { 0xeeeeeeff, 0x00000000, 0 },  /* battery module while charging */
+-	[SchemeBatLow]    = { 0xeeeeeeff, 0xff0000ff, 0 },  /* battery module below barbatwarn */
+-	[SchemeCpu]       = { 0xbbbbbbff, 0x00000000, 0 },  /* CPU module */
+-	[SchemeCpuWarn]   = { 0xeeeeeeff, 0xff0000ff, 0 },  /* CPU module above barcpuwarn */
+-	[SchemeRam]       = { 0xbbbbbbff, 0x00000000, 0 },  /* RAM module */
+-	[SchemeRamWarn]   = { 0xeeeeeeff, 0xff0000ff, 0 },  /* RAM module above barramwarn */
+-	[SchemeTemp]      = { 0xbbbbbbff, 0x00000000, 0 },  /* temperature module */
+-	[SchemeTempWarn]  = { 0xeeeeeeff, 0xff0000ff, 0 },  /* temperature module above bartempwarn */
+-	[SchemeLayout]    = { 0xbbbbbbff, 0x00000000, 0 },  /* keyboard layout module */
++	[SchemeNorm]      = { WALR_DIM,      WALR_BG_CLEAR, 0 },  /* tag: normal */
++	[SchemeSel]       = { WALR_BG,       WALR_ACCENT,   0 },  /* tag: selected */
++	[SchemeUrg]       = { WALR_BG,       WALR_URGENT,   0 },  /* tag: urgent */
++	[SchemeOcc]       = { WALR_DIM,      WALR_BG_CLEAR, 0 },  /* tag: occupied (see baroccscheme) */
++	[SchemeBar]       = { WALR_FG,       WALR_BG_CLEAR, 0 },  /* bar background: transparent */
++	[SchemeStatus]    = { WALR_FG,       0x00000000,    0 },  /* status text */
++	[SchemeSep]       = { WALR_DIM,      0x00000000,    0 },  /* module separators */
++	[SchemeBorder]    = { 0,             WALR_BG_CLEAR, 0 },  /* bar border (background value is the border color) */
++	[SchemeVolume]    = { WALR_FG,       0x00000000,    0 },  /* volume module */
++	[SchemeMuted]     = { WALR_DIM,      0x00000000,    0 },  /* volume module while muted */
++	[SchemeBrightness]= { WALR_FG,       0x00000000,    0 },  /* brightness module */
++	[SchemeBattery]   = { WALR_FG,       0x00000000,    0 },  /* battery module */
++	[SchemeBatChg]    = { WALR_ACCENT,   0x00000000,    0 },  /* battery module while charging */
++	[SchemeBatLow]    = { WALR_BG,       WALR_URGENT,   0 },  /* battery module below barbatwarn */
++	[SchemeCpu]       = { WALR_DIM,      0x00000000,    0 },  /* CPU module */
++	[SchemeCpuWarn]   = { WALR_BG,       WALR_URGENT,   0 },  /* CPU module above barcpuwarn */
++	[SchemeRam]       = { WALR_DIM,      0x00000000,    0 },  /* RAM module */
++	[SchemeRamWarn]   = { WALR_BG,       WALR_URGENT,   0 },  /* RAM module above barramwarn */
++	[SchemeTemp]      = { WALR_DIM,      0x00000000,    0 },  /* temperature module */
++	[SchemeTempWarn]  = { WALR_BG,       WALR_URGENT,   0 },  /* temperature module above bartempwarn */
++	[SchemeLayout]    = { WALR_DIM,      0x00000000,    0 },  /* keyboard layout module */
+ };
+diff --git a/config/config_input.h b/config/config_input.h
+index f1d7f13..9319a7b 100644
+--- a/config/config_input.h
++++ b/config/config_input.h
+@@ -10,16 +10,17 @@ static const double tablet_area[4] 		   = { 0.4,  0.4,  0.4,   0.4 };  /* used p
+  * XKB keymap. Other fields (.rules, .model, .variant, .options) can be
+  * added; several layouts are comma-separated, e.g. .layout = "us,ru". */
+ static const struct xkb_rule_names xkb_rules = {
+-	.layout = "us",
++	.layout = "us,ru",
++	.options = "grp:win_space_toggle",
+ };
+ 
+-static const int repeat_rate = 25;  /* key repeats per second */
+-static const int repeat_delay = 600;  /* delay in ms before a held key starts repeating */
++static const int repeat_rate = 40;  /* key repeats per second */
++static const int repeat_delay = 250;  /* delay in ms before a held key starts repeating */
+ 
+ /* --- Touchpad (libinput) --- */
+ static const int tap_to_click = 1;  /* 1 = tapping clicks */
+ static const int tap_and_drag = 1;  /* 1 = tap, then touch and move to drag */
+-static const int drag_lock = 1;  /* 1 = a drag continues after lifting the finger briefly */
++static const int drag_lock = 0;  /* 1 = a drag continues after lifting the finger briefly */
+ static const int natural_scrolling = 0;  /* 1 = content follows the finger direction */
+ static const int disable_while_typing = 1;  /* 1 = ignore the touchpad while typing */
+ static const int left_handed = 0;  /* 1 = swap left and right buttons */
+diff --git a/config/config_keys.h b/config/config_keys.h
+index 06736de..856d8a3 100644
+--- a/config/config_keys.h
++++ b/config/config_keys.h
+@@ -23,32 +23,48 @@
+ /* Helper: run a shell command string via /bin/sh -c, e.g. SHCMD("cmd | cmd"). */
+ #define SHCMD(cmd) { .v = (const char*[]){ "/bin/sh", "-c", cmd, NULL } }
+ 
+-/* Commands started by the bindings below (NULL-terminated argv arrays). */
++/* Commands started by the bindings below (NULL-terminated argv arrays).
++ * The personal helpers (wmenu-apps, lilith-*, swaylock-pywal) live in
++ * ~/.local/bin and are resolved via $PATH — no hardcoded home paths. */
+ static const char *termcmd[] = { "foot", NULL };  /* terminal */
+ static const char *clockcmd[] ={ "foot", "-a", "clock", "tty-clock", "-sc", "-C", "7", NULL };  /* tty-clock (seconds, centered, color 7) in a terminal with app id "clock" */
+-static const char *wlaunch[] = { "wmenu-run", NULL };  /* application launcher */
++/* static const char *wlaunch[] = { "wmenu-run", NULL };  */ /* disabled: replaced with wmenu-apps */
++static const char *wmenu[] = { "wmenu-apps", NULL };  /* launcher with the user's app list */
++static const char *yazi[]  = { "foot", "-a", "yazi", "yazi", NULL };  /* file manager */
+ static const char *btop[]    = { "foot", "btop", NULL };  /* system monitor in a terminal */
+-static const char *telegram[]= { "Telegram", NULL };  /* Telegram client */
+-static const char *browser[] = { "firefox", NULL };  /* web browser */
+-static const char *volupcmd[]   = { "wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", "5%+", NULL };  /* volume +5% (capped at 100%) */
+-static const char *voldowncmd[] = { "wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%-", NULL };  /* volume -5% */
+-static const char *volmutecmd[] = { "wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle", NULL };  /* toggle mute */
++static const char *telegram[]= { "materialgram", NULL };  /* Telegram client */
++static const char *browser[] = { "helium", NULL };  /* web browser */
++/* audio: pywal OSD via dunst (lilith-volume), visible above fullscreen windows */
++static const char *volupcmd[]   = { "lilith-volume", "up",   NULL };
++static const char *voldowncmd[] = { "lilith-volume", "down", NULL };
++static const char *volmutecmd[] = { "lilith-volume", "mute", NULL };
+ static const char *brupcmd[]    = { "brightnessctl", "set", "10%+", NULL };  /* brightness +10% */
+ static const char *brdowncmd[]  = { "brightnessctl", "set", "10%-", NULL };  /* brightness -10% */
+ 
++/* Session helpers. */
++static const char *lockcmd[]    = { "swaylock-pywal", NULL };
++static const char *clipcmd[]    = { "lilith-cliphist", NULL };
++static const char *shotfull[]   = { "lilith-screenshot", "full", NULL };
++static const char *shotregion[] = { "lilith-screenshot", "region", NULL };
++
+ /* Keyboard bindings. */
+ static const Key keys[] = {
+ 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_f,		  spawn,	    {.v = browser} },  /* Super+Shift+F: open browser (also bound to togglefullscreen below, which is never reached) */
+ 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_t,		  spawn,	    {.v = telegram} },  /* Super+Shift+T: open Telegram */
+ 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_b,		  spawn,	    {.v = btop} },  /* Super+Shift+B: open btop */
+ 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_d,		  spawn,	    {.v = clockcmd} },  /* Super+Shift+D: open clock */
+-	{ MODKEY,                    XKB_KEY_r,           spawn,            {.v = wlaunch} },  /* Super+R: application launcher */
++	{ MODKEY,                    XKB_KEY_r,           spawn,            {.v = wmenu} },  /* Super+R: application launcher */
++	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_e,           spawn,            {.v = yazi} },  /* Super+Shift+E: file manager */
+ 	{ MODKEY,                    XKB_KEY_z,		  zoomfit,	    {0} },  /* Super+Z: zoom out to fit all windows */
+ 	{ MODKEY,                    XKB_KEY_q,           spawn,            {.v = termcmd} },  /* Super+Q: open terminal */
++	{ MODKEY,                    XKB_KEY_l,           spawn,            {.v = lockcmd} },  /* Super+L: lock the session */
++	{ MODKEY,                    XKB_KEY_v,           spawn,            {.v = clipcmd} },  /* Super+V: clipboard history */
++	{ 0,                         XKB_KEY_Print,       spawn,            {.v = shotfull} },  /* PrtScr: full screenshot (save + clip + notify) */
++	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_s,           spawn,            {.v = shotregion} },  /* Super+Shift+S: region screenshot */
+ 	{ MODKEY,                    XKB_KEY_Tab,         focusstackcenter,       {.i = +1} },  /* Super+Tab: focus next window and center the view on it */
+ 	{ MODKEY,                    XKB_KEY_k,           focusstackcenter,       {.i = -1} },  /* Super+K: focus previous window and center the view on it */
+ 	{ MODKEY,                    XKB_KEY_c,           killclient,       {0} },  /* Super+C: close focused window */
+-	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_f,           togglefullscreen, {0} },  /* Super+Shift+F: toggle fullscreen (shadowed by the browser binding above) */
++	{ MODKEY,                    XKB_KEY_f,           togglefullscreen, {0} },  /* Super+F: toggle fullscreen */
+ 	{ MODKEY,                    XKB_KEY_0,           view,             {.ui = ~0} },  /* Super+0: show all tags */
+ 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_parenright,  tag,              {.ui = ~0} },  /* Super+Shift+0: show the focused window on all tags */
+ 	{ MODKEY,                    XKB_KEY_comma,       focusmon,         {.i = WLR_DIRECTION_LEFT} },  /* Super+,: focus the monitor to the left */
+@@ -88,10 +104,13 @@ static const Key keys[] = {
+ 	{ MODKEY, XKB_KEY_equal, zoom,      {.f =  +0.25f} },  /* Super+=: zoom in */
+ 	{ MODKEY, XKB_KEY_minus, zoom,      {.f = -0.25f} },  /* Super+-: zoom out */
+ 
+-	/* Media keys; barspawn runs the command and refreshes the bar modules. */
+-	{ 0, XKB_KEY_XF86AudioRaiseVolume,  barspawn, {.v = volupcmd} },  /* volume up */
+-	{ 0, XKB_KEY_XF86AudioLowerVolume,  barspawn, {.v = voldowncmd} },  /* volume down */
+-	{ 0, XKB_KEY_XF86AudioMute,         barspawn, {.v = volmutecmd} },  /* mute toggle */
++	/* Media keys; barspawn runs the command and refreshes the bar modules.
++	 * Volume uses spawn: lilith-volume shows the dunst OSD, which stays
++	 * visible above fullscreen windows (the bar does not). Brightness has no
++	 * OSD, so it keeps barspawn for instant bar refresh. */
++	{ 0, XKB_KEY_XF86AudioRaiseVolume,  spawn,    {.v = volupcmd} },  /* volume up */
++	{ 0, XKB_KEY_XF86AudioLowerVolume,  spawn,    {.v = voldowncmd} },  /* volume down */
++	{ 0, XKB_KEY_XF86AudioMute,         spawn,    {.v = volmutecmd} },  /* mute toggle */
+ 	{ 0, XKB_KEY_XF86MonBrightnessUp,   barspawn, {.v = brupcmd} },  /* brightness up */
+ 	{ 0, XKB_KEY_XF86MonBrightnessDown, barspawn, {.v = brdowncmd} },  /* brightness down */
+ 
+diff --git a/screenshots/field.jpg b/screenshots/field.jpg
+new file mode 100644
+index 0000000..26c4f14
+Binary files /dev/null and b/screenshots/field.jpg differ
+diff --git a/screenshots/painting.png b/screenshots/painting.png
+new file mode 100644
+index 0000000..b82b6d2
+Binary files /dev/null and b/screenshots/painting.png differ
+diff --git a/screenshots/red.png b/screenshots/red.png
+new file mode 100644
+index 0000000..6afd869
+Binary files /dev/null and b/screenshots/red.png differ
+diff --git a/screenshots/sky.png b/screenshots/sky.png
+new file mode 100644
+index 0000000..df4be49
+Binary files /dev/null and b/screenshots/sky.png differ
+diff --git a/src/lilith.c b/src/lilith.c
+index 7f80322..585de46 100644
+--- a/src/lilith.c
++++ b/src/lilith.c
+@@ -3717,7 +3717,9 @@ spawn(const Arg *arg)
+ 		dup2(STDERR_FILENO, STDOUT_FILENO);
+ 		setsid();
+ 		execvp(((char **)arg->v)[0], (char **)arg->v);
+-		die("lilith: execvp %s failed:", ((char **)arg->v)[0]);
++		fprintf(stderr, "lilith: execvp %s failed: ", ((char **)arg->v)[0]);
++		perror(NULL);
++		_exit(1); /* the child must die after a failed execvp (_exit, not return) */
+ 	}
+ }
+ 

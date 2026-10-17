@@ -1,0 +1,80 @@
+#!/bin/sh
+# wmenu-apps — application launcher for lilith (Win+R).
+#
+# Unlike `wmenu-run` (which dumps every executable in $PATH), this lists real
+# .desktop applications, skipping NoDisplay/Hidden entries, and honours an
+# editable ignore list at ~/.config/wmenu/ignore. Colored with pywal.
+set -eu
+
+selfdir=$(dirname "$0")
+IGNORE="${XDG_CONFIG_HOME:-$HOME/.config}/wmenu/ignore"
+
+data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+data_dirs="${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+
+tmp=$(mktemp) || exit 1
+trap 'rm -f "$tmp"' EXIT HUP INT TERM
+
+# parse one .desktop file -> "name<TAB>term<TAB>exec"  (nothing if not shown)
+parse() {
+	awk '
+		/^\[Desktop Entry\]/ { sec = 1; next }
+		/^\[/ { sec = 0 }
+		sec && /^Name=/       { n  = substr($0, 6) }
+		sec && /^Exec=/       { ex = substr($0, 6) }
+		sec && /^Type=/       { ty = substr($0, 6) }
+		sec && /^NoDisplay=/  { nd = substr($0, 11) }
+		sec && /^Hidden=/     { hd = substr($0, 8) }
+		sec && /^Terminal=/   { tm = substr($0, 10) }
+		END {
+			if (ty != "Application") exit
+			if (nd == "true" || hd == "true") exit
+			if (n == "" || ex == "") exit
+			gsub(/%[fFuUdDnNickvm]/, "", ex)   # strip field codes
+			sub(/[ \t]+$/, "", ex)
+			if (ex == "") exit
+			printf "%s\t%s\t%s\n", n, (tm == "true" ? "1" : "0"), ex
+		}
+	' "$1"
+}
+
+seen=""
+scan() {
+	dir=$1
+	[ -d "$dir" ] || return 0
+	for f in "$dir"/*.desktop; do
+		[ -f "$f" ] || continue
+		id=$(basename "$f")
+		case "$seen" in *"|$id|"*) continue ;; esac
+		seen="$seen|$id|"
+		if [ -f "$IGNORE" ] && grep -qxF "$id" "$IGNORE" 2>/dev/null; then
+			continue
+		fi
+		parse "$f" >> "$tmp"
+	done
+}
+
+scan "$data_home/applications"
+for d in $(printf '%s' "$data_dirs" | tr ':' ' '); do
+	scan "$d/applications"
+done
+
+if [ ! -s "$tmp" ]; then
+	echo "wmenu-apps: no applications found" >&2
+	exit 1
+fi
+
+sel=$(cut -f1 "$tmp" | MENU="${WMENU:-/usr/bin/wmenu}" "$selfdir/wmenu-pywal" -i -p 'run:') || exit 0
+[ -n "$sel" ] || exit 0
+
+# map the chosen name back to its exec + terminal flag
+IFS="$(printf '\t')" read -r term cmd <<EOF
+$(awk -F'\t' -v s="$sel" '$1 == s { print $2 "\t" $3; exit }' "$tmp")
+EOF
+[ -n "${cmd:-}" ] || exit 0
+
+if [ "$term" = "1" ]; then
+	setsid foot -e sh -c "$cmd" >/dev/null 2>&1 &
+else
+	setsid sh -c "$cmd" >/dev/null 2>&1 &
+fi

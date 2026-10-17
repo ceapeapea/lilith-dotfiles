@@ -1,0 +1,51 @@
+#!/bin/sh
+# wal-portal — drive the desktop-portal / GTK appearance from the pywal16 palette.
+#
+#   * org.freedesktop.appearance "color-scheme" -> prefer-dark / prefer-light,
+#     picked from the palette background luminance. The portal relays this, so
+#     sandboxed (flatpak) apps follow it.
+#   * org.gnome.desktop.interface "accent-color" -> the GNOME accent nearest to
+#     pywal's color4. Native GTK4/libadwaita apps read this key directly.
+#
+# Caveat: xdg-desktop-portal-gtk 1.15.3 does NOT relay accent-color through the
+# Settings portal (only color-scheme), so sandboxed apps get the scheme but not
+# the exact accent.
+set -eu
+
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/wal"
+[ -f "$CACHE/colors.sh" ] || { echo "wal-portal: no palette at $CACHE/colors.sh" >&2; exit 1; }
+. "$CACHE/colors.sh"
+
+bg="${background:-#000000}"
+c4="${color4:-#3584e4}"
+
+dec() { printf '%d' "0x$1"; }
+
+# hex without leading '#' -> "r g b"
+rgb() {
+	_h=$1
+	_r=${_h%????}; _g=${_h#??}; _g=${_g%??}; _b=${_h#????}
+	echo "$(dec "$_r") $(dec "$_g") $(dec "$_b")"
+}
+
+# dark vs light from background luminance (Rec. 709)
+set -- $(rgb "${bg#\#}")
+lum=$(( (2126 * $1 + 7152 * $2 + 722 * $3) / 10000 ))
+if [ "$lum" -gt 128 ]; then scheme=prefer-light; else scheme=prefer-dark; fi
+
+# nearest GNOME accent to color4
+set -- $(rgb "${c4#\#}"); cr=$1; cg=$2; cb=$3
+best=""; bd=""
+for pair in blue:3584e4 teal:2190a4 green:3a944a yellow:c88800 \
+            orange:ed5b00 red:e62d42 pink:d56199 purple:9141ac slate:6f8396; do
+	name=${pair%%:*}; hex=${pair#*:}
+	set -- $(rgb "$hex")
+	d=$(( (cr - $1) * (cr - $1) + (cg - $2) * (cg - $2) + (cb - $3) * (cb - $3) ))
+	if [ -z "$bd" ] || [ "$d" -lt "$bd" ]; then bd=$d; best=$name; fi
+done
+
+gsettings set org.gnome.desktop.interface color-scheme "$scheme" 2>/dev/null || true
+gsettings set org.gnome.desktop.interface accent-color "$best" 2>/dev/null || true
+
+printf 'wal-portal: color-scheme=%s accent-color=%s (bg=%s color4=%s)\n' \
+	"$scheme" "$best" "$bg" "$c4"
