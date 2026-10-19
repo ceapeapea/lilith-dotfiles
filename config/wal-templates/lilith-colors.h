@@ -16,8 +16,6 @@
 #define WAL_FG_CLEAR  COLOR(0x{foreground.strip}00)
 #define WAL_BG_DIM    COLOR(0x{background.strip}67)
 
-#define WAL_WHITE     COLOR(0xffffffff)
-
 #define WAL_ACCENT    COLOR(0x{color4.strip}ff)
 #define WAL_ACCENT2   COLOR(0x{color2.strip}ff)
 #define WAL_URGENT    COLOR(0x{color1.strip}ff)

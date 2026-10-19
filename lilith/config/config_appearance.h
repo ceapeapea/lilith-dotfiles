@@ -19,17 +19,17 @@ static const int wallpaper_edge = 1;  /* mode 1 only: 1 = never show the backgro
 /* Inner border width in pixels. */
 static const unsigned int innerborderpx = 5;
 
-static const float focused_inner_border_color[]    = WAL_ACCENT;   /* inner border of the focused window */
-static const float urgent_inner_border_color[]     = WAL_URGENT;   /* inner border of a window requesting attention */
-static const float unfocused_inner_border_color[]  = WAL_ACCENT;   /* inner border of unfocused windows */
+static const float focused_inner_border_color[]    = WAL_BG_CLEAR;  /* inner border of the focused window (0xRRGGBBAA; alpha 00 = invisible) */
+static const float urgent_inner_border_color[]     = WAL_BG_CLEAR;  /* inner border of a window requesting attention */
+static const float unfocused_inner_border_color[]  = WAL_FG_CLEAR;  /* inner border of unfocused windows */
 
 /* Outer border width in pixels. */
 static const unsigned int outerborderpx = 5;
 
-/* White outer border, no focus highlight. */
-static const float focused_outer_border_color[]    = WAL_WHITE;
+/* Focus highlight disabled: focused border matches unfocused. */
+static const float focused_outer_border_color[]    = WAL_BG;
 static const float urgent_outer_border_color[]     = WAL_URGENT;
-static const float unfocused_outer_border_color[]  = WAL_WHITE;
+static const float unfocused_outer_border_color[]  = WAL_BG;
 
 /* Gap in pixels between windows when they snap to each other while being
  * moved or resized; negative values make neighbouring borders overlap.
@@ -41,7 +41,7 @@ static const float unfocused_outer_border_color[]  = WAL_WHITE;
 
 /* Appearance: 0 = invisible, 1 = filled with SPAWNREGION_COLOR,
  * 2 = outlined using the spawnregion_* border settings below. */
-#define SPAWNREGION_STYLE 1
+#define SPAWNREGION_STYLE 2
 
 /* Fill color for style 1 (0xRRGGBBAA). */
 #define SPAWNREGION_COLOR WAL_BG_DIM
